@@ -140,10 +140,10 @@ void proxy_server::read_from_client(struct kevent& event) {
         struct client* client = clients.at(event.ident).get();
         update_timer(client->get_fd(), TIMEOUT);
         client->read(event.data);
-        if (http_request::is_request_ended(client->get_text())) {
-            std::unique_ptr<http_request> request(new (std::nothrow) http_request(client->get_text()));
+        if (http_request::is_request_ended(client->get_buffer())) {
+            std::unique_ptr<http_request> request(new (std::nothrow) http_request(client->get_buffer()));
             if(!request) {
-                client->get_text() = BAD_REQUEST;
+                client->get_buffer() = BAD_REQUEST;
                 queue.add_event([this](struct kevent& ev) {this->write_to_client(ev);},
                                 client->get_fd(), EVFILT_WRITE, EV_ADD | EV_ENABLE);
                 return;
@@ -151,7 +151,7 @@ void proxy_server::read_from_client(struct kevent& event) {
             responses[client->get_fd()] = http_response();
             responses[client->get_fd()].set_url(request->get_url());
             if(client->has_server() && client->get_host() == request->get_host()) {
-                client->send_message();
+                client->send_msg();
                 queue.add_event([this](struct kevent& kev) {this->write_to_server(kev);},
                                 client->get_server_fd(), EVFILT_WRITE, EV_ADD | EV_ENABLE);
                 return;
@@ -180,7 +180,7 @@ void proxy_server::read_header_from_server(struct kevent& event) {
     }
     if (response->is_headert_ended()) {
         std::cout<<" PARSING HEADER WILL BE \n";
-        server->send_message();
+        server->send_msg();
         queue.add_event([this](struct kevent& kev) {this->read_from_server(kev);}, event.ident, EVFILT_READ, EV_ADD);
         queue.add_event([this](struct kevent& kev){this->write_to_client(kev);}, server->get_client_fd(), EVFILT_WRITE, EV_ADD | EV_ENABLE);
     }
@@ -196,7 +196,7 @@ void proxy_server::read_from_server(struct kevent& event) {
     if (msg.length() > 0) {
         http_response* response = &responses.at(server->get_client_fd());
         response->append_text(msg);
-        server->send_message();
+        server->send_msg();
         std::cout<< "CONTINUE WRITING TO CLIENT\n";
         queue.add_event(server->get_client_fd(), EVFILT_WRITE, EV_ENABLE);
     }
@@ -218,7 +218,7 @@ void proxy_server::write_to_server(struct kevent& event) {
     }
     server->write();
     std::cout<<"BEFORE READING HRADER FROM CLIENT\n";
-    if (server->text_empty()) {
+    if (server->buffer_empty()) {
         std::cout<<"OOOOOOOOOOOOO\n";
         queue.add_event([this](struct kevent& ev) {this->read_header_from_server(ev);}, event.ident, EVFILT_READ, EV_ADD);
         queue.delete_event(event.ident, event.filter);
@@ -232,8 +232,8 @@ void proxy_server::write_to_client(struct kevent& event) {
     struct client* client = clients.at(event.ident).get();
     update_timer(client->get_fd(),TIMEOUT);
     client->write();
-    if (client->has_server()) client->get_message();
-    if (client->get_text_size() == 0) {
+    if (client->has_server()) client->get_msg();
+    if (client->get_buffer_size() == 0) {
         queue.add_event(event.ident, event.filter, EV_DISABLE, 0, 0, nullptr);
     }
 }
@@ -252,7 +252,7 @@ void proxy_server::on_host_resolved(struct kevent& event) {
     update_timer(client->get_fd(), TIMEOUT);
     requests.erase(client->get_fd());
     if (request->get_state() == BAD) {
-        client->get_text() = BAD_REQUEST;
+        client->get_buffer() = BAD_REQUEST;
         queue.add_event([this](struct kevent& kev) {this->write_to_client(kev);}, client->get_fd(), EVFILT_WRITE, EV_ADD | EV_ENABLE);
         return;
     }
@@ -264,9 +264,9 @@ void proxy_server::on_host_resolved(struct kevent& event) {
         server->bind(client);
         servers[server->get_fd()] = server;
         queue.add_event([this](struct kevent& kev) {this->write_to_server(kev);}, server->get_fd(), EVFILT_WRITE, EV_ADD);
-        client->send_message();
+        client->send_msg();
     } catch (...) {
-        client->get_text() = BAD_REQUEST;
+        client->get_buffer() = BAD_REQUEST;
         queue.add_event(client->get_fd(), EVFILT_WRITE, EV_ADD | EV_ENABLE);
         return;
     }

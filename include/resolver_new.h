@@ -2,6 +2,8 @@
 #define RESOLVER_H
 
 #include "task_wrapper.h"
+#include "exceptions.h"
+
 class resolver {
 public:
     resolver();

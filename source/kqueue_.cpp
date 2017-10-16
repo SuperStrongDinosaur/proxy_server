@@ -1,7 +1,7 @@
 #include <iostream>
 
 #include "exceptions.h"
-#include "kqueue_.h"
+#include "kqueue.h"
 #include <sys/socket.h>
 #include <sys/errno.h>
 #include <iostream>
@@ -11,7 +11,6 @@ kqueue_::kqueue_()  {
         throw my_exception("kqueue creating error");
     }
 }
-
 
 void kqueue_::add_event_handler(const struct kevent& kev) {
     if (kevent(kq.get_fd(), &kev, 1, nullptr, 0, nullptr) == -1) {

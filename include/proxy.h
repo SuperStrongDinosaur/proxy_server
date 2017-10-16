@@ -1,7 +1,7 @@
 #ifndef PROXY_H
 #define PROXY_H
 
-#include "kqueue_.h"
+#include "kqueue.h"
 #include "sockets.h"
 #include "http.h"
 #include "resolver_new.h"
